@@ -644,7 +644,9 @@ public final class SQLServerDriver implements java.sql.Driver {
     public static void register() throws SQLException {
         if (!isRegistered()) {
             mssqlDriver = new SQLServerDriver();
-            DriverManager.registerDriver(mssqlDriver);
+            DriverManager.registerDriver(mssqlDriver, () -> {
+                SharedTimer.close();
+            });
         }
     }
 

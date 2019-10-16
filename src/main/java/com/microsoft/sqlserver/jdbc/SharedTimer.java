@@ -8,7 +8,6 @@ import java.io.Serializable;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 
@@ -26,13 +25,9 @@ class SharedTimer implements Serializable {
      * Unique ID of this SharedTimer
      */
     private final long id = CORE_THREAD_COUNTER.getAndIncrement();
-    /**
-     * Number of outstanding references to this SharedTimer
-     */
-    private final AtomicInteger refCount = new AtomicInteger();
 
     private static volatile SharedTimer instance;
-    private ScheduledThreadPoolExecutor executor;
+    private final ScheduledThreadPoolExecutor executor;
 
     private SharedTimer() {
         executor = new ScheduledThreadPoolExecutor(1, task -> {
@@ -55,40 +50,34 @@ class SharedTimer implements Serializable {
     }
 
     /**
-     * Remove a reference to this SharedTimer.
-     *
-     * If the reference count reaches zero then the underlying executor will be shutdown so that its thread stops.
+     * Close existing SharedTimer.
      */
-    public void removeRef() {
-        synchronized (lock) {
-            if (refCount.get() <= 0) {
-                throw new IllegalStateException("removeRef() called more than actual references");
-            }
-            if (refCount.decrementAndGet() == 0) {
-                // Removed last reference so perform cleanup
-                executor.shutdownNow();
-                executor = null;
-                instance = null;
+    public static void close() {
+        SharedTimer timer = instance;
+        if (timer != null) {
+            synchronized (lock) {
+                if ((timer = instance) != null) {
+                    instance = null;
+                    timer.executor.shutdown();
+                }
             }
         }
     }
 
     /**
      * Retrieve a reference to existing SharedTimer or create a new one.
-     *
-     * The SharedTimer's reference count will be incremented to account for the new reference.
-     *
-     * When the caller is finished with the SharedTimer it must be released via {@link#removeRef}
      */
     public static SharedTimer getTimer() {
-        synchronized (lock) {
-            if (instance == null) {
-                // No shared object exists so create a new one
-                instance = new SharedTimer();
+        SharedTimer timer = instance;
+        if(timer == null) {
+            synchronized (lock) {
+                if ((timer = instance) == null) {
+                    // No shared object exists so create a new one
+                    instance = timer = new SharedTimer();
+                }
             }
-            instance.refCount.getAndIncrement();
-            return instance;
         }
+        return timer;
     }
 
     /**

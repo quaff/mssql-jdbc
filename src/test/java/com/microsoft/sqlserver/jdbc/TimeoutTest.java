@@ -77,6 +77,7 @@ public class TimeoutTest extends AbstractTest {
 
     @Test
     public void testZeroTimeoutShouldNotStartTimerThread() throws SQLException {
+        SharedTimer.close();
         try (Connection conn = getConnection()) {
             // Connection is open but we have not used a timeout so it should be running
             assertSharedTimerNotRunning();
@@ -88,6 +89,7 @@ public class TimeoutTest extends AbstractTest {
 
     @Test
     public void testNoTimeoutShouldNotStartTimerThread() throws SQLException {
+        SharedTimer.close();
         try (Connection conn = getConnection()) {
             // Connection is open but we have not used a timeout so it should not be running
             assertSharedTimerNotRunning();
@@ -110,6 +112,7 @@ public class TimeoutTest extends AbstractTest {
 
     @Test
     public void testNestedTimeoutShouldKeepTimerThreadRunning() throws SQLException {
+        SharedTimer.close();
         try (Connection conn = getConnection()) {
             // Connection is open but we have not used a timeout so it should not be running
             assertSharedTimerNotRunning();
@@ -159,18 +162,14 @@ public class TimeoutTest extends AbstractTest {
     }
 
     @Test
-    public void testSameSharedTimerRetrieved() {
-        SharedTimer timer = SharedTimer.getTimer();
-        try {
-            SharedTimer otherTimer = SharedTimer.getTimer();
-            try {
-                assertEquals("The same SharedTimer should be returned", timer.getId(), otherTimer.getId());
-            } finally {
-                otherTimer.removeRef();
-            }
-        } finally {
-            timer.removeRef();
+    public void testCloseSharedTimer() throws SQLException, InterruptedException{
+        try (Connection conn = getConnection()) {
+            runQuery(conn, "SELECT 1", TIMEOUT_SECONDS);
+            assertSharedTimerIsRunning();
         }
+        SharedTimer.close();
+        waitForSharedTimerThreadToStop();
+        assertSharedTimerNotRunning();
     }
 
     private static boolean isSharedTimerThreadRunning() {

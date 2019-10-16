@@ -3329,7 +3329,6 @@ public class SQLServerConnection implements ISQLServerConnection, java.io.Serial
 
     private void clearConnectionResources() {
         if (sharedTimer != null) {
-            sharedTimer.removeRef();
             sharedTimer = null;
         }
 
